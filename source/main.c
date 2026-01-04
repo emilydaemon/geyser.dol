@@ -34,56 +34,13 @@
 #define GRRLIB_AQUA    0x00FFFFFF
 #define GRRLIB_WHITE   0xFFFFFFFF
 
-#define RECTANGLE_COUNT 2
+#define MAX_RECTANGLES 12
 
 #define SAMPLE_RATE 48000
-#define RENDER_RATE SAMPLE_RATE * 2
 #define MIN_FREQ 440
 #define MAX_FREQ 1760
 
-#define VOICE_RUNNING			0x40000000
-
-struct aesndpb_t
-{
-    u32 out_buf;				//0
-
-    u32 buf_start;				//4
-    u32 buf_end;				//8
-    u32 buf_curr;				//12
-
-    u16 yn1;					//16
-    u16 yn2;					//18
-    u16 pds;					//20
-
-    u16 freq_h;					//22
-    u16 freq_l;					//24
-    u16 counter;				//26
-
-    s16 left,right;				//28,30
-    u16 volume_l,volume_r;		//32,34
-
-    u32 delay;					//36
-
-    u32 flags;					//40
-
-    u8 _pad[20];
-
-    u32 mram_start;
-    u32 mram_curr;
-    u32 mram_end;
-    u32 stream_last;
-
-    u32 voiceno;
-    u32 shift;
-    AESNDVoiceCallbackArg cb;
-    void *cbArg;
-
-    AESNDAudioCallbackArg audioCB;
-    void *audioCBArg;
-};
-
 // static u8 CalculateFrameRate(void);
-
 
 static void VoiceCallBack(AESNDPB *pb, u32 state)
 {
@@ -91,10 +48,8 @@ static void VoiceCallBack(AESNDPB *pb, u32 state)
         AESND_FreeVoice(pb);
 }
 
-
-s16 *generate_sine(void) {
+static s16 *generate_sine(void) {
     double freq = ((double)rand() / (double)RAND_MAX) * (MAX_FREQ - MIN_FREQ) + MIN_FREQ;
-    printf("%f", freq);
 
     s16 *output_buffer = malloc(SAMPLE_RATE * 2);
     if (!output_buffer) {
@@ -104,7 +59,7 @@ s16 *generate_sine(void) {
     double phase = 0.0;
     double phase_step = (2.0 * M_PI * freq) / (double)SAMPLE_RATE;
 
-    for (int i = 0; i < SAMPLE_RATE; i++) {
+    for (u16 i = 0; i < SAMPLE_RATE; i++) {
         output_buffer[i] = (s16)(sin(phase) * 32767);
 
         phase += phase_step;
@@ -112,22 +67,20 @@ s16 *generate_sine(void) {
         if (phase >= 2.0 * M_PI) {
             phase -= 2.0 * M_PI;
         }
-        // printf("%i", output_buffer[i]);
     }
 
     return output_buffer;
 }
 
-const u32 rectColor[RECTANGLE_COUNT] = {
-    GRRLIB_RED,
-    GRRLIB_BLUE
-};
+static u32 rectColors[MAX_RECTANGLES];
+
+static void get_rect_colors(u8 count);
 
 typedef struct {
     f32 x, y, w, h;
 } Rect;
 
-Rect random_rectangle(void) {
+static Rect random_rectangle(void) {
     const f32 x = (float)rand() / (float)RAND_MAX * rmode->fbWidth;
     const f32 y = (float)rand() / (float)RAND_MAX * rmode->efbHeight;
     return (Rect){
@@ -138,7 +91,7 @@ Rect random_rectangle(void) {
     };
 }
 
-void delay(unsigned s) {
+static void delay(unsigned s) {
     unsigned long long start, end;
     start = gettime();
     while (1)
@@ -149,16 +102,17 @@ void delay(unsigned s) {
     }
 }
 
+static u8 rectangleCount = 4;
+
 int main() {
     unsigned long long start = gettime(), end = gettime();
     s16 slide = -1;
-    // u8 FPS = 0;
 
     AESND_Init();
 
     AESNDPB* voice;
 
-    Rect rects[RECTANGLE_COUNT];
+    Rect rects[MAX_RECTANGLES];
 
     srand(time(0));
 
@@ -169,14 +123,22 @@ int main() {
     GRRLIB_SetBackgroundColour(255, 255, 255, 255);
 
     WPAD_Init();
-    // WPAD_SetDataFormat(WPAD_CHAN_0, WPAD_FMT_BTNS_ACC_IR);
+
+    get_rect_colors(rectangleCount);
+
+    GRRLIB_FillScreen(GRRLIB_WHITE);
+    GRRLIB_Render();
+
     delay(1);
     s16 *soundBuf = generate_sine();
     voice = AESND_AllocateVoice(VoiceCallBack);
     AESND_PlayVoice(voice, VOICE_MONO16, soundBuf, SAMPLE_RATE * 2, SAMPLE_RATE, 0, false);
+
     while(1) {
         char str[25];
         if (diff_sec(start,end)) {
+            // get_rect_colors(rectangleCount);
+
             if (slide == 9999) break;
 
             soundBuf = generate_sine();
@@ -184,36 +146,35 @@ int main() {
             voice = AESND_AllocateVoice(VoiceCallBack);
             AESND_PlayVoice(voice, VOICE_MONO16, soundBuf, SAMPLE_RATE * 2, SAMPLE_RATE, 0, false);
             free(soundBuf);
-            rects[0] = random_rectangle();
-            rects[1] = random_rectangle();
+            for (u8 i = 0; i < rectangleCount; i++) {
+                rects[i] = random_rectangle();
+            }
 
             start = gettime();
             end = gettime();
 
             slide++;
         } else end = gettime();
-        // WPAD_SetVRes(0, 640, 480);
         WPAD_ScanPads();
         const u32 wpaddown = WPAD_ButtonsDown(0);
         // const u32 wpadheld = WPAD_ButtonsHeld(0);
 
         if (wpaddown & WPAD_BUTTON_HOME) break;
-        // WPAD_IR(WPAD_CHAN_0, &ir1);
 
-        GRRLIB_FillScreen(GRRLIB_WHITE);    // Clear the screen
-        for (u8 i = 0; i < RECTANGLE_COUNT; i++) {
+        GRRLIB_FillScreen(GRRLIB_WHITE);
+        for (u8 i = 0; i < rectangleCount; i++) {
             GRRLIB_Rectangle(
                 rects[i].x,
                 rects[i].y,
                 rects[i].w,
                 rects[i].h,
-                rectColor[i],
+                rectColors[i],
                 true
             );
         };
 
         sprintf(str, "geyser.dol - slide %04u", slide);
-        GRRLIB_PrintfTTF(16, rmode->efbHeight - 48, font, str, 16, GRRLIB_BLACK);
+        GRRLIB_PrintfTTF(16, rmode->efbHeight - 43, font, str, 11, GRRLIB_BLACK);
 
         GRRLIB_Render();
     }
@@ -221,9 +182,103 @@ int main() {
     AESND_FreeVoice(voice);
 
     GRRLIB_FreeTTF(font);
-    GRRLIB_Exit(); // Be a good boy, clear the memory allocated by GRRLIB
+    GRRLIB_Exit();
     exit(0);
     return 0;
+}
+
+static void get_rect_colors(u8 count) {
+    rectColors[0] = GRRLIB_BLUE;
+    switch (count) {
+        case 2:
+            rectColors[1] = GRRLIB_RED;
+            break;
+        case 3:
+            rectColors[1] = GRRLIB_LIME;
+            rectColors[2] = GRRLIB_RED;
+            break;
+        case 4:
+            rectColors[1] = GRRLIB_LIME;
+            rectColors[2] = GRRLIB_YELLOW;
+            rectColors[3] = GRRLIB_RED;
+            break;
+        case 5:
+            rectColors[1] = GRRLIB_AQUA;
+            rectColors[2] = GRRLIB_LIME;
+            rectColors[3] = GRRLIB_YELLOW;
+            rectColors[4] = GRRLIB_RED;
+            break;
+        case 6:
+            rectColors[1] = GRRLIB_AQUA;
+            rectColors[2] = GRRLIB_LIME;
+            rectColors[3] = GRRLIB_YELLOW;
+            rectColors[4] = GRRLIB_RED;
+            rectColors[5] = GRRLIB_FUCHSIA;
+            break;
+        case 7:
+            rectColors[1] = GRRLIB_AQUA;
+            rectColors[2] = GRRLIB_LIME;
+            rectColors[3] = GRRLIB_YELLOW;
+            rectColors[4] = GRRLIB_RED;
+            rectColors[5] = GRRLIB_FUCHSIA;
+            rectColors[6] = GRRLIB_NAVY;
+            break;
+        case 8:
+            rectColors[1] = GRRLIB_AQUA;
+            rectColors[2] = GRRLIB_LIME;
+            rectColors[3] = GRRLIB_YELLOW;
+            rectColors[4] = GRRLIB_RED;
+            rectColors[5] = GRRLIB_FUCHSIA;
+            rectColors[6] = GRRLIB_NAVY;
+            rectColors[7] = GRRLIB_MAROON;
+            break;
+        case 9:
+            rectColors[1] = GRRLIB_AQUA;
+            rectColors[2] = GRRLIB_LIME;
+            rectColors[3] = GRRLIB_YELLOW;
+            rectColors[4] = GRRLIB_RED;
+            rectColors[5] = GRRLIB_FUCHSIA;
+            rectColors[6] = GRRLIB_NAVY;
+            rectColors[7] = GRRLIB_GREEN;
+            rectColors[8] = GRRLIB_MAROON;
+            break;
+        case 10:
+            rectColors[1] = GRRLIB_AQUA;
+            rectColors[2] = GRRLIB_LIME;
+            rectColors[3] = GRRLIB_YELLOW;
+            rectColors[4] = GRRLIB_RED;
+            rectColors[5] = GRRLIB_FUCHSIA;
+            rectColors[6] = GRRLIB_NAVY;
+            rectColors[7] = GRRLIB_GREEN;
+            rectColors[8] = GRRLIB_OLIVE;
+            rectColors[9] = GRRLIB_MAROON;
+            break;
+        case 11:
+            rectColors[1] = GRRLIB_AQUA;
+            rectColors[2] = GRRLIB_LIME;
+            rectColors[3] = GRRLIB_YELLOW;
+            rectColors[4] = GRRLIB_RED;
+            rectColors[5] = GRRLIB_FUCHSIA;
+            rectColors[6] = GRRLIB_TEAL;
+            rectColors[7] = GRRLIB_NAVY;
+            rectColors[8] = GRRLIB_GREEN;
+            rectColors[9] = GRRLIB_OLIVE;
+            rectColors[10] = GRRLIB_MAROON;
+            break;
+        case 12:
+            rectColors[1] = GRRLIB_AQUA;
+            rectColors[2] = GRRLIB_LIME;
+            rectColors[3] = GRRLIB_YELLOW;
+            rectColors[4] = GRRLIB_RED;
+            rectColors[5] = GRRLIB_FUCHSIA;
+            rectColors[6] = GRRLIB_TEAL;
+            rectColors[7] = GRRLIB_NAVY;
+            rectColors[8] = GRRLIB_GREEN;
+            rectColors[9] = GRRLIB_OLIVE;
+            rectColors[10] = GRRLIB_MAROON;
+            rectColors[11] = GRRLIB_PURPLE;
+            break;
+    }
 }
 
 // static u8 CalculateFrameRate(void) {
