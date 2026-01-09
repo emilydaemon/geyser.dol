@@ -15,33 +15,15 @@
 #include <wiiuse/wpad.h>
 #include <aesndlib.h>
 
+#include "video.h"
+
 #include "freemonobold_ttf.h"
-
-// RGBA Colors
-#define GRRLIB_BLACK   0x000000FF
-#define GRRLIB_MAROON  0x800000FF
-#define GRRLIB_GREEN   0x008000FF
-#define GRRLIB_OLIVE   0x808000FF
-#define GRRLIB_NAVY    0x000080FF
-#define GRRLIB_PURPLE  0x800080FF
-#define GRRLIB_TEAL    0x008080FF
-#define GRRLIB_GRAY    0x808080FF
-#define GRRLIB_SILVER  0xC0C0C0FF
-#define GRRLIB_RED     0xFF0000FF
-#define GRRLIB_LIME    0x00FF00FF
-#define GRRLIB_YELLOW  0xFFFF00FF
-#define GRRLIB_BLUE    0x0000FFFF
-#define GRRLIB_FUCHSIA 0xFF00FFFF
-#define GRRLIB_AQUA    0x00FFFFFF
-#define GRRLIB_WHITE   0xFFFFFFFF
-
-#define MAX_RECTANGLES 12
 
 #define SAMPLE_RATE 48000
 #define MIN_FREQ 440
 #define MAX_FREQ 1760
 
-// static u8 CalculateFrameRate(void);
+extern u32 rectColors[MAX_RECTANGLES];
 
 static void VoiceCallBack(AESNDPB *pb, u32 state)
 {
@@ -71,25 +53,6 @@ static s16 *generate_sine(void) {
     }
 
     return output_buffer;
-}
-
-static u32 rectColors[MAX_RECTANGLES];
-
-static void get_rect_colors(u8 count);
-
-typedef struct {
-    f32 x, y, w, h;
-} Rect;
-
-static Rect random_rectangle(void) {
-    const f32 x = (float)rand() / (float)RAND_MAX * rmode->fbWidth;
-    const f32 y = (float)rand() / (float)RAND_MAX * rmode->efbHeight;
-    return (Rect){
-        x,
-        y,
-        ((float)rand() / (float)RAND_MAX) * (rmode->fbWidth - x),
-        ((float)rand() / (float)RAND_MAX) * (rmode->efbHeight - y)
-    };
 }
 
 static void delay(unsigned s) {
@@ -148,7 +111,7 @@ int main() {
             AESND_PlayVoice(voice, VOICE_MONO16, soundBuf, SAMPLE_RATE * 2, SAMPLE_RATE, 0, false);
             free(soundBuf);
             for (u8 i = 0; i < rectangleCount; i++) {
-                rects[i] = random_rectangle();
+                rects[i] = random_rectangle(rmode->fbWidth, rmode->efbHeight);
             }
 
             start = gettime();
@@ -188,111 +151,4 @@ int main() {
     return 0;
 }
 
-static void get_rect_colors(u8 count) {
-    rectColors[0] = GRRLIB_BLUE;
-    switch (count) {
-        case 2:
-            rectColors[1] = GRRLIB_RED;
-            break;
-        case 3:
-            rectColors[1] = GRRLIB_LIME;
-            rectColors[2] = GRRLIB_RED;
-            break;
-        case 4:
-            rectColors[1] = GRRLIB_LIME;
-            rectColors[2] = GRRLIB_YELLOW;
-            rectColors[3] = GRRLIB_RED;
-            break;
-        case 5:
-            rectColors[1] = GRRLIB_AQUA;
-            rectColors[2] = GRRLIB_LIME;
-            rectColors[3] = GRRLIB_YELLOW;
-            rectColors[4] = GRRLIB_RED;
-            break;
-        case 6:
-            rectColors[1] = GRRLIB_AQUA;
-            rectColors[2] = GRRLIB_LIME;
-            rectColors[3] = GRRLIB_YELLOW;
-            rectColors[4] = GRRLIB_RED;
-            rectColors[5] = GRRLIB_FUCHSIA;
-            break;
-        case 7:
-            rectColors[1] = GRRLIB_AQUA;
-            rectColors[2] = GRRLIB_LIME;
-            rectColors[3] = GRRLIB_YELLOW;
-            rectColors[4] = GRRLIB_RED;
-            rectColors[5] = GRRLIB_FUCHSIA;
-            rectColors[6] = GRRLIB_NAVY;
-            break;
-        case 8:
-            rectColors[1] = GRRLIB_AQUA;
-            rectColors[2] = GRRLIB_LIME;
-            rectColors[3] = GRRLIB_YELLOW;
-            rectColors[4] = GRRLIB_RED;
-            rectColors[5] = GRRLIB_FUCHSIA;
-            rectColors[6] = GRRLIB_NAVY;
-            rectColors[7] = GRRLIB_MAROON;
-            break;
-        case 9:
-            rectColors[1] = GRRLIB_AQUA;
-            rectColors[2] = GRRLIB_LIME;
-            rectColors[3] = GRRLIB_YELLOW;
-            rectColors[4] = GRRLIB_RED;
-            rectColors[5] = GRRLIB_FUCHSIA;
-            rectColors[6] = GRRLIB_NAVY;
-            rectColors[7] = GRRLIB_GREEN;
-            rectColors[8] = GRRLIB_MAROON;
-            break;
-        case 10:
-            rectColors[1] = GRRLIB_AQUA;
-            rectColors[2] = GRRLIB_LIME;
-            rectColors[3] = GRRLIB_YELLOW;
-            rectColors[4] = GRRLIB_RED;
-            rectColors[5] = GRRLIB_FUCHSIA;
-            rectColors[6] = GRRLIB_NAVY;
-            rectColors[7] = GRRLIB_GREEN;
-            rectColors[8] = GRRLIB_OLIVE;
-            rectColors[9] = GRRLIB_MAROON;
-            break;
-        case 11:
-            rectColors[1] = GRRLIB_AQUA;
-            rectColors[2] = GRRLIB_LIME;
-            rectColors[3] = GRRLIB_YELLOW;
-            rectColors[4] = GRRLIB_RED;
-            rectColors[5] = GRRLIB_FUCHSIA;
-            rectColors[6] = GRRLIB_TEAL;
-            rectColors[7] = GRRLIB_NAVY;
-            rectColors[8] = GRRLIB_GREEN;
-            rectColors[9] = GRRLIB_OLIVE;
-            rectColors[10] = GRRLIB_MAROON;
-            break;
-        case 12:
-            rectColors[1] = GRRLIB_AQUA;
-            rectColors[2] = GRRLIB_LIME;
-            rectColors[3] = GRRLIB_YELLOW;
-            rectColors[4] = GRRLIB_RED;
-            rectColors[5] = GRRLIB_FUCHSIA;
-            rectColors[6] = GRRLIB_TEAL;
-            rectColors[7] = GRRLIB_NAVY;
-            rectColors[8] = GRRLIB_GREEN;
-            rectColors[9] = GRRLIB_OLIVE;
-            rectColors[10] = GRRLIB_MAROON;
-            rectColors[11] = GRRLIB_PURPLE;
-            break;
-    }
-}
 
-// static u8 CalculateFrameRate(void) {
-//     static u8 frameCount = 0;
-//     static u32 lastTime;
-//     static u8 FPS = 0;
-//     const u32 currentTime = ticks_to_millisecs(gettime());
-//
-//     frameCount++;
-//     if(currentTime - lastTime > 1000) {
-//         lastTime = currentTime;
-//         FPS = frameCount;
-//         frameCount = 0;
-//     }
-//     return FPS;
-// }
